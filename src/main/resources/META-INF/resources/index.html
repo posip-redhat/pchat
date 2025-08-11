@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Quarkus Persistent Chat</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f0f2f5;
+        }
+        .chat-container {
+            max-width: 800px;
+            margin: 40px auto;
+            background-color: #ffffff;
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+            overflow: hidden;
+        }
+        .chat-header {
+            background-color: #4f46e5; /* Indigo 600 */
+            color: white;
+            padding: 1.5rem;
+            text-align: center;
+            font-size: 1.5rem;
+            font-weight: 700;
+        }
+        .chat-messages {
+            height: 400px;
+            overflow-y: auto;
+            padding: 1.5rem;
+            border-bottom: 1px solid #e5e7eb; /* Gray 200 */
+            background-color: #f9fafb; /* Gray 50 */
+        }
+        .message-bubble {
+            background-color: #e0e7ff; /* Indigo 100 */
+            border-radius: 8px;
+            padding: 0.75rem 1rem;
+            margin-bottom: 0.75rem;
+            max-width: 80%;
+            word-wrap: break-word;
+        }
+        .message-bubble strong {
+            color: #3730a3; /* Indigo 800 */
+        }
+        .system-message {
+            text-align: center;
+            font-style: italic;
+            color: #6b7280; /* Gray 500 */
+            margin-bottom: 0.75rem;
+        }
+        .input-area {
+            padding: 1.5rem;
+            display: flex;
+            gap: 1rem;
+            align-items: center;
+        }
+        .input-area input[type="text"] {
+            flex-grow: 1;
+            padding: 0.75rem 1rem;
+            border: 1px solid #d1d5db; /* Gray 300 */
+            border-radius: 8px;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+        .input-area input[type="text"]:focus {
+            border-color: #6366f1; /* Indigo 500 */
+        }
+        .input-area button {
+            background-color: #6366f1; /* Indigo 500 */
+            color: white;
+            padding: 0.75rem 1.5rem;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background-color 0.2s;
+            border: none;
+        }
+        .input-area button:hover {
+            background-color: #4f46e5; /* Indigo 600 */
+        }
+        .connect-section {
+            padding: 1.5rem;
+            background-color: #f0f2f5;
+            border-bottom: 1px solid #e5e7eb;
+            display: flex;
+            gap: 1rem;
+            align-items: center;
+            justify-content: center;
+        }
+        .connect-section input {
+            padding: 0.75rem 1rem;
+            border: 1px solid #d1d5db;
+            border-radius: 8px;
+            outline: none;
+        }
+        .connect-section button {
+            background-color: #10b981; /* Emerald 500 */
+            color: white;
+            padding: 0.75rem 1.5rem;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background-color 0.2s;
+            border: none;
+        }
+        .connect-section button:hover {
+            background-color: #059669; /* Emerald 600 */
+        }
+        .disconnect-button {
+            background-color: #ef4444; /* Red 500 */
+            margin-left: 1rem;
+        }
+        .disconnect-button:hover {
+            background-color: #dc2626; /* Red 600 */
+        }
+        .status-message {
+            text-align: center;
+            color: #ef4444;
+            margin-top: 1rem;
+            font-weight: 600;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 flex items-center justify-center min-h-screen">
+    <div class="chat-container">
+        <div class="chat-header">Demo WebSocket Persisted Chat</div>
+
+        <div class="connect-section" id="connectSection">
+            <input type="text" id="usernameInput" placeholder="Enter your username" class="flex-grow">
+            <button id="connectButton">Connect</button>
+        </div>
+
+        <div class="chat-messages" id="messages">
+            <!-- Chat messages will be appended here -->
+        </div>
+
+        <div class="input-area" id="inputArea" style="display: none;">
+            <input type="text" id="messageInput" placeholder="Type your message..." autofocus>
+            <button id="sendButton">Send</button>
+            <button id="disconnectButton" class="disconnect-button">Disconnect</button>
+        </div>
+        <div id="statusMessage" class="status-message"></div>
+    </div>
+
+    <script>
+        const usernameInput = document.getElementById('usernameInput');
+        const connectButton = document.getElementById('connectButton');
+        const disconnectButton = document.getElementById('disconnectButton');
+        const messagesDiv = document.getElementById('messages');
+        const messageInput = document.getElementById('messageInput');
+        const sendButton = document.getElementById('sendButton');
+        const connectSection = document.getElementById('connectSection');
+        const inputArea = document.getElementById('inputArea');
+        const statusMessageDiv = document.getElementById('statusMessage');
+
+        let ws;
+        let username = '';
+
+        function showStatusMessage(message, type = 'error') {
+            statusMessageDiv.textContent = message;
+            statusMessageDiv.style.color = type === 'error' ? '#ef4444' : '#10b981';
+            setTimeout(() => {
+                statusMessageDiv.textContent = '';
+            }, 5000);
+        }
+
+        function appendMessage(sender, message) {
+            const messageElement = document.createElement('div');
+            if (sender === 'SYSTEM') {
+                messageElement.className = 'system-message';
+                messageElement.textContent = message;
+            } else {
+                messageElement.className = 'message-bubble';
+                const strong = document.createElement('strong');
+                strong.textContent = sender + ': ';
+                messageElement.appendChild(strong);
+                messageElement.appendChild(document.createTextNode(message));
+            }
+            messagesDiv.appendChild(messageElement);
+            messagesDiv.scrollTop = messagesDiv.scrollHeight; // Scroll to bottom
+        }
+
+        function connectWebSocket() {
+            username = usernameInput.value.trim();
+            if (!username) {
+                showStatusMessage("Please enter a username.", 'error');
+                return;
+            }
+
+            // Determine WebSocket URL (ws:// for http, wss:// for https)
+            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            const host = window.location.host;
+            const wsUrl = `${protocol}//${host}/pchat/${username}`;
+
+            ws = new WebSocket(wsUrl);
+
+            ws.onopen = (event) => {
+                console.log('WebSocket connected:', event);
+                connectSection.style.display = 'none';
+                inputArea.style.display = 'flex';
+                messageInput.focus();
+                showStatusMessage("Connected to chat as " + username, 'success');
+            };
+
+            ws.onmessage = (event) => {
+                console.log('Message received:', event.data);
+                const parts = event.data.split(': ', 2);
+                if (parts.length === 2) {
+                    appendMessage(parts[0], parts[1]);
+                } else {
+                    // Handle system messages or malformed messages
+                    appendMessage('SYSTEM', event.data);
+                }
+            };
+
+            ws.onclose = (event) => {
+                console.log('WebSocket disconnected:', event);
+                connectSection.style.display = 'flex';
+                inputArea.style.display = 'none';
+                showStatusMessage("Disconnected from chat.", 'error');
+                ws = null;
+            };
+
+            ws.onerror = (error) => {
+                console.error('WebSocket error:', error);
+                showStatusMessage("WebSocket error. Please try again.", 'error');
+                if (ws) {
+                    ws.close();
+                }
+            };
+        }
+
+        function sendMessage() {
+            const message = messageInput.value.trim();
+            if (message && ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(message);
+                messageInput.value = ''; // Clear input field
+            } else if (!ws || ws.readyState !== WebSocket.OPEN) {
+                showStatusMessage("Not connected to chat. Please connect first.", 'error');
+            }
+        }
+
+        function disconnectWebSocket() {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.close();
+            }
+        }
+
+        connectButton.addEventListener('click', connectWebSocket);
+        sendButton.addEventListener('click', sendMessage);
+        disconnectButton.addEventListener('click', disconnectWebSocket);
+
+        messageInput.addEventListener('keypress', (event) => {
+            if (event.key === 'Enter') {
+                sendMessage();
+            }
+        });
+
+        usernameInput.addEventListener('keypress', (event) => {
+            if (event.key === 'Enter') {
+                connectWebSocket();
+            }
+        });
+    </script>
+</body>
+</html>
