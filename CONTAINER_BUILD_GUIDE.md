@@ -4,20 +4,20 @@ This guide explains the different container build options available for the PCha
 
 ## Container Options
 
-### 1. UBI 9 JDK21 Runtime packaged as uber jar (Recommended)
-**File:** `src/main/docker/Containerfile.ubi9-jre-uber`
+### 1. UBI 10 minimal with JRE and Quarkus app packaged as uber jar (Recommended)
+**File:** `./Containerfile`
 
-- **Base Image:** `registry.access.redhat.com/ubi9/openjdk-21-runtime:latest`
+- **Base Image:** `registry.access.redhat.com/ubi10/ubi0minimal:10.0-1754585875`
 - **Java Version:** OpenJDK 21 (headless)
 - **Build Type:** Runtime-only (requires pre-built application as uber jar)
-- **Image Size:** ~210MB (smallest)
+- **Image Size:** ~190MB (smallest)
 - **Security:** Minimal attack surface with only essential packages
 
 **Benefits:**
 - Smallest image size and attack surface
-- Latest UBI 9 base with security updates
+- Latest UBI 10 base with security updates
 - Optimized for production workloads
-- FIPS compliance ready
+- Latest FIPS compliance ready
 
 **Usage:**
 ```bash
@@ -25,23 +25,37 @@ This guide explains the different container build options available for the PCha
 ./mvnw package -Dquarkus.package.jar.type=uber-jar
 
 # Build container
-podman build -f src/main/docker/Containerfile.ubi9-jre-uber -t pchat:ubi9jre21uber-latest .
+podman build -t pchat-ubi10-minimal .
 ```
 
-### 2. UBI 9 JDK21 Runtime (Slightly Larger)
+
+### 2. UBI 9 JDK21 Runtime packaged as uber jar
+**File:** `src/main/docker/Containerfile.ubi9-jre-uber`
+
+- **Base Image:** `registry.access.redhat.com/ubi9/openjdk-21-runtime:latest`
+- **Java Version:** OpenJDK 21 (headless)
+- **Build Type:** Runtime-only (requires pre-built application as uber jar)
+- **Image Size:** ~210MB
+
+
+**Usage:**
+```bash
+# Build application first
+./mvnw package -Dquarkus.package.jar.type=uber-jar
+
+# Build container
+podman build -f src/main/docker/Containerfile.ubi9-jre-uber -t pchat-ubi9jre21uber-latest .
+```
+
+### 3. UBI 9 JDK21 Runtime (Slightly Larger)
 **File:** `src/main/docker/Containerfile.ubi9-jre`
 
 - **Base Image:** UBI 9 with OpenJDK 21 (runtime)
 - **Java Version:** OpenJDK 21
 - **Build Type:** Runtime-only (requires pre-built application)
 - **Image Size:** ~220MB
-- **Modularity:** Artifacts deployed as layers for incremental updates
+- **Modularity:** Artifacts deployed as layers for incremental updates with optimized layering for better caching
 
-**Benefits:**
-- Latest UBI 9 base with security updates
-- Optimized layering for better caching
-- Build-time security scanning
-- FIPS compliance ready
 
 **Usage:**
 ```bash
@@ -49,10 +63,9 @@ podman build -f src/main/docker/Containerfile.ubi9-jre-uber -t pchat:ubi9jre21ub
 ./mvnw package
 
 # Build container
-podman build -f src/main/docker/Containerfile.ubi9-jre-uber -t pchat:ubi9jre21uber-latest .
+podman build -f src/main/docker/Containerfile.ubi9-jre -t pchat-ubi9jre21-latest .
 
 ```
-
 
 ## Runtime Configuration
 
@@ -79,7 +92,6 @@ JAVA_INITIAL_MEM_RATIO=25      # Initial heap as percentage of max heap
 QUARKUS_HTTP_HOST=0.0.0.0      # HTTP binding host
 QUARKUS_HTTP_PORT=8080         # HTTP port
 QUARKUS_LOG_LEVEL=INFO         # Log level
-QUARKUS_PROFILE=prod           # Quarkus profile
 
 # Database configuration
 QUARKUS_DATASOURCE_JDBC_URL="jdbc:postgresql://db:5432/pchat"
@@ -103,20 +115,9 @@ podman run -it --rm \
   --network=host \
   -e JAVA_DEBUG=true \
   -e QUARKUS_LOG_LEVEL=DEBUG \
-  pchat:ubi9jre21uber-latest
+  pchat:ubi10-minimal
 ```
 
-#### Production
-```bash
-# Production deployment
-podman run -d \
-  -p 8080:8080 \
-  -e JAVA_OPTS="-Xmx1g -XX:+UseG1GC" \
-  -e QUARKUS_PROFILE=prod \
-  -v /app/config:/deployments/config:ro \
-  --name pchat-prod \
-  pchat:ubi9jre21uber-latest
-```
 
 
 ## Security Considerations
@@ -128,7 +129,7 @@ podman run -d \
 - **Compliance:** Meets enterprise security requirements
 
 ### Container Security Best Practices
-1. **Non-root User:** All containers run as non-root user (UID 185)
+1. **Non-root User:** All containers run as non-root user
 2. **Read-only Filesystem:** Application files are read-only
 3. **Minimal Packages:** Only essential packages installed
 4. **Security Contexts:** Kubernetes security contexts configured
@@ -159,47 +160,15 @@ clair-scanner   pchat:ubi9jre21uber-latest
 
 # Clean build
 ./mvnw clean package -DskipTests
-
-# Verbose container build
-podman build --log-level debug -f src/main/docker/Containerfile.ubi9-jre-uber -t test .
 ```
-
-#### Runtime Issues
-```bash
-# Check container logs
-podman logs pchat-container
-
-# Debug inside container
-podman exec -it pchat-container /bin/bash
-
-# Check Java version
-podman exec -it pchat-container java -version
-```
-
-
-
-## Performance Optimization
-
-### JVM Tuning for Containers
-```bash
-# G1GC with low pause times
-JAVA_OPTS="-XX:+UseG1GC -XX:MaxGCPauseMillis=100"
-
-# Container-aware settings
-JAVA_OPTS="-XX:+UseContainerSupport -XX:InitialRAMPercentage=50"
-
-# Startup optimization
-JAVA_OPTS="-XX:+TieredCompilation -XX:TieredStopAtLevel=1"
-```
-
 
 ## Registry Configuration
 
 ### Container Registry Options
 ```bash
 # Red Hat Quay
-podman tag pchat:ubi9jre21uber-latest quay.io/yourorg/pchat:ubi9-latest
-podman push quay.io/yourorg/pchat:ubi9-latest
+podman tag pchat-ubi10-minimal quay.io/yourorg/pchat:ubi10-minimal
+podman push quay.io/yourorg/pchat:ubi10-minimal
 
 ```
 
