@@ -38,6 +38,7 @@ mvn quarkus:dev
 Open your web browser and navigate to http://localhost:8080/.
 
 You can open multiple browser tabs with different usernames to test the chat functionality. Messages will be persisted in the PostgreSQL database.
+![Alt text](./images/pchat-example.png)
 
 ## Packaging and running the application
 
