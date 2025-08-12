@@ -4,12 +4,22 @@ This sample persistent chat application uses Quarkus.
 
 If you want to learn more about Quarkus, please visit its website: <https://quarkus.io/>.
 
+
 ## Running the application in dev mode
 
-> **_NOTE:_**  Application expects to have a postgres db running on localhost on port 5432 when running locally
+
+### Prerequisites
+
+* Java 17+
+
+* Maven 3.8.x+
+
+* Docker or Podman (for container build)
+
+* A PostgreSQL database instance (ensure it's accessible and update application.properties with its connection details).
 
 ### Running postgres db locally in a container
-
+> **_NOTE:_**  Application expects to have a postgres db running on localhost on port 5432 when running locally
 This requires registering with registry.redhat.io to be able to pull the appropriate UBI backed container image
 
 **Usage:**
